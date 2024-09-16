@@ -8,12 +8,12 @@ import java.util.Date
 
 interface AuthRepository {
     suspend fun login(email: String, password: String): Flow<Resources<UserModel>>
-    suspend fun register(
+    suspend fun signup(
         email: String,
         userName: String,
         password: String,
-        fullName: String,
         birthDay: Date,
         role: UserRole
     ): Flow<Resources<Boolean>>
+
 }

@@ -37,3 +37,25 @@ fun String.isDateSmallerThan(date: String): Boolean {
     // Check if the age is smaller than 18
     return age < 18
 }
+
+fun String.getUsernameFromEmail(): String {
+    return if (this.length < 8) {
+        "user${(1000..9999).random()}"
+    } else {
+        this.substringBefore("@")
+    }
+}
+
+fun String.getNameFromEmail(): String {
+    return this.substringBefore("@").replace(".", " ")
+}
+
+fun String.emailIsValid(): Boolean {
+    return android.util.Patterns.EMAIL_ADDRESS.matcher(this).matches()
+}
+
+fun String.strongPassword(): Boolean {
+    val passwordPattern =
+        "^(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z])(?=.*[@#$%^&+=])(?=\\S+$).{8,}$".toRegex()
+    return passwordPattern.matches(this)
+}

@@ -1,17 +1,24 @@
 package com.pwhs.quickmem.presentation.auth.signup.email
 
 import androidx.lifecycle.ViewModel
-import com.pwhs.quickmem.core.data.UserRole
+import androidx.lifecycle.viewModelScope
 import com.pwhs.quickmem.core.utils.Resources
+import com.pwhs.quickmem.domain.model.auth.SignupRequestModel
 import com.pwhs.quickmem.domain.repository.AuthRepository
+import com.pwhs.quickmem.util.emailIsValid
+import com.pwhs.quickmem.util.getNameFromEmail
+import com.pwhs.quickmem.util.getUsernameFromEmail
+import com.pwhs.quickmem.util.strongPassword
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import timber.log.Timber
-import java.util.Date
+import java.util.Random
 import javax.inject.Inject
 
 @HiltViewModel
@@ -31,11 +38,23 @@ class SignupWithEmailViewModel @Inject constructor(
             }
 
             is SignUpWithEmailUiAction.EmailChanged -> {
-                _uiState.update { it.copy(email = event.email) }
+                if (!event.email.emailIsValid()) {
+                    _uiState.update { it.copy(emailError = "Invalid email") }
+                    _uiState.update { it.copy(email = event.email) }
+                } else {
+                    _uiState.update { it.copy(emailError = "") }
+                    _uiState.update { it.copy(email = event.email) }
+                }
             }
 
             is SignUpWithEmailUiAction.PasswordChanged -> {
-                _uiState.update { it.copy(password = event.password) }
+                if (!event.password.strongPassword()) {
+                    _uiState.update { it.copy(passwordError = "Password must contain at least 8 characters, one uppercase, one lowercase, one number and one special character") }
+                    _uiState.update { it.copy(password = event.password) }
+                } else {
+                    _uiState.update { it.copy(passwordError = "") }
+                    _uiState.update { it.copy(password = event.password) }
+                }
             }
 
             is SignUpWithEmailUiAction.UserRoleChanged -> {
@@ -43,7 +62,44 @@ class SignupWithEmailViewModel @Inject constructor(
             }
 
             is SignUpWithEmailUiAction.SignUp -> {
-                TODO()
+                signUp()
+            }
+        }
+    }
+
+    private fun signUp() {
+        viewModelScope.launch {
+            val avatarUrl = Random().nextInt(100).toString()
+            val username = uiState.value.email.getUsernameFromEmail()
+            val fullName = uiState.value.email.getNameFromEmail()
+            val response = authRepository.signup(
+                signUpRequestModel = SignupRequestModel(
+                    avatarUrl = avatarUrl,
+                    email = uiState.value.email,
+                    username = username,
+                    fullName = fullName,
+                    role = uiState.value.userRole,
+                    birthday = uiState.value.birthday,
+                    password = uiState.value.password
+                )
+            )
+
+            response.collectLatest { resource ->
+                when (resource) {
+                    is Resources.Error -> {
+                        Timber.e(resource.message)
+                        _uiEvent.send(SignUpWithEmailUiEvent.SignUpFailure)
+                    }
+
+                    is Resources.Loading -> {
+                        _uiState.update { it.copy(isLoading = true) }
+                    }
+
+                    is Resources.Success -> {
+                        _uiEvent.send(SignUpWithEmailUiEvent.SignUpSuccess)
+                    }
+                }
+
             }
         }
     }
